@@ -1,17 +1,20 @@
+import argparse
+import concurrent
+import logging
+import os
+import pandas as pd
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
-import concurrent
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm.auto import tqdm
-import pandas as pd
-import time
-import os
+
 
 def setup_driver(headless=True):
     """
@@ -95,3 +98,45 @@ def fetch_collection_data_concurrently(collection_ids, max_workers=5):
 
     df = pd.DataFrame(results)
     return df
+
+def main():
+    """Main function to orchestrate the web scraping process."""
+    # Set up Selenium WebDriver
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service=service)
+
+    # URL to scrape
+    url = "https://www.cvh.ac.cn/spms/list.php?&offset=0"
+
+    # Open the URL
+    driver.get(url)
+
+    # Wait for the dynamic content to load
+    time.sleep(5)  # Adjust the sleep time according to your internet speed and website response
+
+    # Find all elements with the specified class
+    rows = driver.find_elements(By.CLASS_NAME, 'spms-row')
+
+    # Extract data-collection-id from each row
+    data_collection_ids = [row.get_attribute('data-collection-id') for row in rows]
+
+    # Close the WebDriver
+    driver.quit()
+
+    # Create a DataFrame
+    data_collection_ids  = pd.DataFrame(data_collection_ids, columns=['Data Collection ID'])
+
+    # Save results
+    sample_collections = list(data_collection_ids['Data Collection ID'])
+    results = fetch_collection_data_concurrently(sample_collections, 30) 
+    results_path = "./scraper_results/results.csv"
+    results.to_csv(results_path, header=True, index=False, encoding='utf-8-sig')
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Web Scraper for CVH Data')
+    parser.add_argument('--output_dir', required=True, help='Directory to save the scraping results.')
+    parser.add_argument('--offset', required=False, help='Offset to the CVH website.')
+    args = parser.parse_args()
+
+    main(args.collection_ids_path, args.output_dir)
