@@ -1,45 +1,89 @@
-import argparse
-import concurrent
-import logging
-import os
-import pandas as pd
-import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
+import time
+
+def scrape_data_collection_ids_for_offset(base_url, offset):
+    """
+    Scrapes data collection IDs from a given page based on the offset.
+
+    Args:
+    - base_url (str): The base URL to scrape, excluding the offset query parameter.
+    - offset (int): The offset to apply to the base URL for pagination.
+
+    Returns:
+    - List of data collection IDs for the given offset (list).
+    """
+    # Set up Chrome options for headless execution
+    chrome_options = Options()
+    chrome_options.add_argument('--headless')
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+
+    # Set up Selenium WebDriver with headless Chrome
+    driver = webdriver.Chrome(options=chrome_options)
+
+    data_collection_ids = []
+
+    # Construct the URL with the provided offset
+    url = f"{base_url}{offset}"
+
+    # Open the URL
+    driver.get(url)
+
+    # Wait for the dynamic content to load
+    time.sleep(5)  # Adjust the sleep time if necessary
+
+    # Find all elements with the specified class
+    rows = driver.find_elements(By.CLASS_NAME, 'spms-row')
+
+    # Extract data-collection-id from each row
+    for row in rows:
+        data_collection_ids.append(row.get_attribute('data-collection-id'))
+
+    # Close the WebDriver
+    driver.quit()
+
+    return data_collection_ids
+
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import TimeoutException
 from webdriver_manager.chrome import ChromeDriverManager
+import concurrent
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm.auto import tqdm
-
+import pandas as pd
+import time
+import os
 
 def setup_driver(headless=True):
-    """
-    Setup a WebDriver used for selenium, using --headeless option as default
-    """
     chrome_options = Options()
     if headless:
         chrome_options.add_argument("--headless")
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+        chrome_options.add_argument('--no-sandbox')
+        chrome_options.add_argument('--disable-dev-shm-usage')
+    # service = Service(ChromeDriverManager().install())
+    # driver = webdriver.Chrome(service=service, options=chrome_options)
+
+    driver = webdriver.Chrome(options=chrome_options)
     return driver
 
-def wait_for_element(driver, by_method, value, timeout=10, retry_interval=5, max_retries=3):
-    """
-    """
+def wait_for_element(driver, by_method, value, timeout=10, retry_interval=3, max_retries=5):
     retries = 0
     while retries < max_retries:
         try:
             return WebDriverWait(driver, timeout).until(EC.presence_of_element_located((by_method, value)))
         except TimeoutException:
-            print(f"Retry {retries+1}/{max_retries} for element {value} after timeout.")
+            # print(f"Retry {retries+1}/{max_retries} for element {value} after timeout.")
             time.sleep(retry_interval)
             retries += 1
         finally:
-            print(f"Retry {retries+1}/{max_retries} for element {value} after timeout.")
+            # print(f"Retry {retries+1}/{max_retries} for element {value} after timeout.")
             time.sleep(retry_interval)
     # raise TimeoutException(f"Element {value} not found after {max_retries} retries.")
     return "Missing Value or Timeout"  # Return None if element is not found
@@ -49,7 +93,7 @@ def fetch_data(collection_id):
     try:
         print(f"Fetching data for collection: {collection_id}\n.")
         driver.get(f"https://www.cvh.ac.cn/spms/detail.php?id={collection_id}")
-        
+
         # Fetch specific details as per your logic
         data = {
             'Collection ID': collection_id,
@@ -74,69 +118,86 @@ def fetch_data(collection_id):
     finally:
         driver.quit()
 
-def fetch_collection_data_concurrently(collection_ids, max_workers=5):
+def fetch_collection_data_concurrently(path, collection_ids, max_workers=10):
     results = []
-    
+
     # Initialize an empty DataFrame to hold column names. This is useful if you expect your first few calls might fail and return None.
-    temp_path = "./scraper_results/temp_results.csv"
-    pd.DataFrame(columns=['Collection ID', 'Image Link', 'Phylum (门)', 'Order (目)', 'Family (科)', 
-                          'Genus (属)', 'Scientific Name', 'Chinese Name', 'Identified By', 
-                          'Date Identified', 'Collector', 'Collection Number', 'Collection Date', 
+    name = next((cid for cid in collection_ids if cid is not None), "default")
+
+    # Concatenate path and name to form temp_path
+    temp_path = f"{path}/{name}.csv"
+    print(temp_path)
+
+    # Ensure the directory exists before attempting to write to it
+    os.makedirs(os.path.dirname(temp_path), exist_ok=True)
+
+    pd.DataFrame(columns=['Collection ID', 'Image Link', 'Phylum (门)', 'Order (目)', 'Family (科)',
+                          'Genus (属)', 'Scientific Name', 'Chinese Name', 'Identified By',
+                          'Date Identified', 'Collector', 'Collection Number', 'Collection Date',
                           'Collection Location', 'Altitude', 'Habitat', 'Phenology']).to_csv(temp_path, mode='w', index=False, encoding='utf-8-sig')
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(fetch_data, cid) for cid in collection_ids]
+        futures = []
+        for cid in collection_ids:
+            try:
+                # Submitting the fetch_data function to the executor
+                future = executor.submit(fetch_data, cid)
+                futures.append(future)
+            except Exception as submit_error:
+                print(f"Failed to submit task for {cid}: {submit_error}")
+
+        results = []
         for future in tqdm(as_completed(futures), total=len(collection_ids)):
-            results.append(future.result())
-            result = future.result()
-            if result:
-                # Append the result to the CSV file
-                try:
-                    pd.DataFrame([result]).to_csv(temp_path, mode='a', header=False, index=False, encoding='utf-8-sig')
-                except PermissionError:
-                    continue
+            try:
+                result = future.result()  # This will raise an exception if the task raised one
+                if result:
+                    # Attempt to append the result to the CSV file
+                    try:
+                        pd.DataFrame([result]).to_csv(temp_path, mode='a', header=False, index=False, encoding='utf-8-sig')
+                    except PermissionError:
+                        print(f"PermissionError: Unable to write to {temp_path}")
+                    except Exception as write_error:
+                        print(f"Error writing to file: {write_error}")
+            except Exception as task_error:
+                print(f"Error retrieving result from future: {task_error}")
 
     df = pd.DataFrame(results)
     return df
 
-def main():
-    """Main function to orchestrate the web scraping process."""
-    # Set up Selenium WebDriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service)
 
-    # URL to scrape
-    url = "https://www.cvh.ac.cn/spms/list.php?&offset=0"
+def scape_cvh(max_offset=298000, total_samples=300, sample_size=30, results_path=".", check_path="./last_offset.txt"):
+    base_url = "https://www.cvh.ac.cn/spms/list.php?&offset="
+    max_offset = max_offset
+    # total_samples = 10000
+    total_samples = total_samples
+    sample_size = sample_size
+    results_path = results_path
+    check_path = check_path
 
-    # Open the URL
-    driver.get(url)
+    # Load or initialize offset
+    if os.path.exists(check_path):
+        with open(check_path, 'r') as file:
+            offset = int(file.read().strip())
+    else:
+        offset = max_offset
 
-    # Wait for the dynamic content to load
-    time.sleep(5)  # Adjust the sleep time according to your internet speed and website response
+    data_collection = []
 
-    # Find all elements with the specified class
-    rows = driver.find_elements(By.CLASS_NAME, 'spms-row')
+    for _ in range(total_samples // sample_size):
+        # Update and wrap-around offset using modulo
+        offset = (offset - sample_size) % max_offset
+        print(f"Fetching data from offset: {offset}")
 
-    # Extract data-collection-id from each row
-    data_collection_ids = [row.get_attribute('data-collection-id') for row in rows]
+        # Scrape and fetch data
+        data_collection_ids = scrape_data_collection_ids_for_offset(base_url, offset)
+        results = fetch_collection_data_concurrently(results_path, data_collection_ids, sample_size)
+        data_collection.extend(results)
 
-    # Close the WebDriver
-    driver.quit()
+        # Save the current offset
+        with open(check_path, 'w') as file:
+            file.write(str(offset))
 
-    # Create a DataFrame
-    data_collection_ids  = pd.DataFrame(data_collection_ids, columns=['Data Collection ID'])
-
-    # Save results
-    sample_collections = list(data_collection_ids['Data Collection ID'])
-    results = fetch_collection_data_concurrently(sample_collections, 30) 
-    results_path = "./scraper_results/results.csv"
-    results.to_csv(results_path, header=True, index=False, encoding='utf-8-sig')
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Web Scraper for CVH Data')
-    parser.add_argument('--output_dir', required=True, help='Directory to save the scraping results.')
-    parser.add_argument('--offset', required=False, help='Offset to the CVH website.')
-    args = parser.parse_args()
-
-    main(args.collection_ids_path, args.output_dir)
+    # Convert list to DataFrame
+    df = pd.DataFrame(data_collection)
+    df.to_csv(results_path + "/results.csv", header=True, index=False, encoding='utf-8-sig')
+    print("Data collection and saving completed.")
