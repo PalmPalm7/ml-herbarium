@@ -19,12 +19,11 @@ Welcome to the Herbaria Batch Metadata Extraction web app, hosted on HuggingFace
 ## Setup and Configuration
 
 ### Prerequisites
-
 - Google Cloud account with access to Document AI.
 - API key for the Gemini model.
 
 ### Environment Variables
-
+- Currently both environment variables are set for initial testing and usage of the application.
 - `GOOGLE_APPLICATION_CREDENTIALS`: Path to your Google Cloud credentials file.
 - `API_KEY`: Your API key for the Gemini model.
 
