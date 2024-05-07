@@ -37,10 +37,6 @@ Welcome to the Herbaria Batch Metadata Extraction web app, hosted on HuggingFace
 
 We welcome contributions from the community, including bug fixes, improvements, or feature requests. Please feel free to fork the repository and submit a pull request.
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## Acknowledgements
 
 - Google Cloud for Document AI services.
