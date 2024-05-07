@@ -11,7 +11,7 @@ Welcome to the Herbaria Batch Metadata Extraction web app, hosted on HuggingFace
 
 ## How to Use
 
-1. **Access the App**: Navigate to the [Herbaria Batch Metadata Extraction](<(https://huggingface.co/spaces/spark-ds549/TrOCR)>) on HuggingFace Spaces.
+1. **Access the App**: Navigate to the [Herbaria Batch Metadata Extraction](<https://huggingface.co/spaces/spark-ds549/TrOCR>) on HuggingFace Spaces.
 2. **Upload Your File**: Click on "Upload ZIP File" and select a ZIP file containing JPEG images.
 3. **View Results**: The extracted metadata will be displayed on the web page.
 4. **Download Results**: Click on "Download this file" to save the extracted labels as a CSV file.
