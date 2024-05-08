@@ -30,6 +30,8 @@ Taxon name preprocessing example:  (e.g. Lysimachia fortunei Maxim. --> Lysimach
 * Collector Accuracy metrics definition: Exact matching of collectors. Groundtruth often hides second authors (et.al.)
 * Collection Date Accuracy metrics definition: Exact matching of YYYYMMDD timestamp.
 
+Demo could be found at: [https://huggingface.co/spaces/spark-ds549/TrOCR](https://huggingface.co/spaces/spark-ds549/TrOCR)
+
 ### 2.2 Benchmark
 
 On accuracy side, while last semesters' works mainly focuses on 
@@ -51,6 +53,7 @@ The time performance was calculated under one linear thread for Document AI and 
 
 Furthermore, if future team seek to recreate Approach 1, please refer to Refer to README.md under /trocr for detailed instructions. If problem arise (likely), please refer to the github issue or the huggingface discussions section[https://huggingface.co/spark-ds549/detr-label-detection/discussions/3].
 
+Benchmark pipeline: /ml-herbarium/Spring2024/benchmark_spring2024.ipynb
 
 ### 2.3 CVH Scraper 
 
@@ -86,7 +89,6 @@ During our quest for training and validation datasets, we located Chinese Virtua
 
 It is worth noting that most modern samples contain printed Chinese and English labels created by both identifier and collector, with high contrast white background and black font.
 
-
 ![png](https://www.cvh.ac.cn/controller/spms/image.php?institutionCode=PE&catalogNumber=02334131)
 
 <p align="center">
@@ -103,7 +105,9 @@ Example 1: Symplocos Jacq.
 <a href="https://www.cvh.ac.cn/spms/detail.php?id=e82ce487">https://www.cvh.ac.cn/spms/detail.php?id=e82ce487</a>
 </p>
 
-The webpage has a dynamic layout with php thus a selenium automation script was produced to scrape the results. Please refer to ml-herbarium/Spring2024/scraper/README_scraper.md for instructions.
+The webpage has a dynamic layout with php thus a selenium automation script was produced to scrape the results. 
+
+Please refer to ml-herbarium/Spring2024/scraper/README_scraper.md for instructions.
 
 
 ### 2.4 Collaboration with Chinese Virtual Herbarium.
